@@ -5,6 +5,25 @@ import numpy as np
 ANNOTATIONS_PATH = os.path.join('.', 'data', 'train_annotations', 'wider_face_train_bbx_gt.txt')
 
 def load_annotations():
+    """
+    Load annotations from the specified file and return them as a dictionary.
+
+    The annotations file is expected to have the following format:
+    - Each line represents an image and its annotations.
+    - The first line of each image entry is the image file name (without extension).
+    - The second line of each image entry is the number of annotations for that image.
+    - The subsequent lines of each image entry are the annotations, each represented as a space-separated list of floats.
+
+    Parameters:
+    None
+
+    Returns:
+    dict: A dictionary where keys are image names and values are lists of annotations.
+
+    Raises:
+    IOError: If the annotations file cannot be opened or read.
+    ValueError: If an invalid integer or float value is found in the annotations file.
+    """
     annotations = {}
     with open(ANNOTATIONS_PATH, 'r') as f:
         lines = f.readlines()
@@ -30,7 +49,7 @@ def load_annotations():
             else:
                 if current_image and annotation_count > 0:
                     try:
-                        annotation = [float(x) for x in line.split()]
+                        annotation = tuple(map(float, line.split()))
                         annotations[current_image].append(annotation)
                         annotation_count -= 1
                     except ValueError:
@@ -43,6 +62,17 @@ def load_annotations():
     return annotations
 
 def preprocess_image(image):
+    """
+    Preprocess an input image by converting it to grayscale, applying Gaussian blur,
+    and then applying a Sobel filter to enhance edges.
+
+    Parameters:
+    image (numpy.ndarray): The input image in BGR format.
+
+    Returns:
+    numpy.ndarray: The preprocessed image in grayscale format with enhanced edges.
+    """
+
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
@@ -60,26 +90,46 @@ def preprocess_image(image):
     return sobel
 
 def load_images_with_annotations(dataset_path, annotations):
-    images = []
-    annotations_list = []
+    """
+    Load images and their corresponding annotations from a dataset directory.
 
+    Parameters:
+    dataset_path (str): The path to the dataset directory containing the images.
+    annotations (dict): A dictionary where keys are image names and values are lists of annotations.
+
+    Returns:
+    tuple: A tuple containing two dictionaries. The first dictionary contains the loaded images,
+           with keys as image names and values as processed images.
+           The second dictionary contains the annotations, with keys as image names and values as lists of annotations.
+    """
+    images = {}
+    annotations_dict = {}
+
+    # Walk through the dataset directory
     for root, _, files in os.walk(dataset_path):
         for file in files:
+            # Check if the file is a JPEG image
             if file.endswith('.jpg'):
+                # Construct the full path to the image file
                 image_path = os.path.join(root, file)
+                
+                # Read the image using OpenCV
                 image = cv2.imread(image_path)
                 
-                # Preprocess image
+                # Preprocess the image
                 processed_image = preprocess_image(image)
                 
                 # Extract the image name from the file path
                 image_name = os.path.splitext(file)[0]
                 
+                # Check if the image has annotations
                 if image_name in annotations:
-                    images.append(processed_image)
-                    annotations_list.append(annotations[image_name])
+                    # Add the image and its annotations to the respective dictionaries
+                    images[image_name] = processed_image
+                    annotations_dict[image_name] = annotations[image_name]
     
-    return images, annotations_list
+    # Return the loaded images and annotations
+    return images, annotations_dict
 
 # Load annotations once
 annotations = load_annotations()
@@ -89,15 +139,19 @@ for key, value in annotations.items():
 
 # Load images and their corresponding annotations
 dataset_path = './data/train'
-images, annotations_list = load_images_with_annotations(dataset_path, annotations)
+images, annotations_dict = load_images_with_annotations(dataset_path, annotations)
 
-print(f'Loaded {len(images)} images and {len(annotations_list)} annotations.')
+print(f'Loaded {len(images)} images and {len(annotations_dict)} annotations.')
 
-# Print a sample annotation for verification
-if images and annotations_list:
-    print('Sample image shape: ', images[0].shape)
-    print('Sample annotations: ', annotations_list[0])
+image_name = '0_Parade_marchingband_1_849'
+
+if image_name in images and image_name in annotations_dict:
+    print(f'Image Name: {image_name}')
+    print(f'Image Shape: {images[image_name].shape}')
+    print(f'Annotations: {annotations_dict[image_name]}')
+else:
+    print(f'Image {image_name} not found in the dataset.')
     
-cv2.imshow('Filtered Image', images[0])
+cv2.imshow('Filtered Image - 0_Parade_marchingband_1_849', images[image_name])
 cv2.waitKey(0) 
-cv2.destroyAllWindows()  
+cv2.destroyAllWindows()
